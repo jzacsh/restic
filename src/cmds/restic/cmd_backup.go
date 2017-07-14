@@ -406,32 +406,11 @@ func runBackup(opts BackupOptions, gopts GlobalOptions, args []string) error {
 
 	Verbosef("scan %v\n", target)
 
-	// add patterns from file
 	if len(opts.ExcludeFiles) > 0 {
-		for _, filename := range opts.ExcludeFiles {
-			file, err := fs.Open(filename)
-			if err != nil {
-				Warnf("error reading exclude patterns: %v", err)
-				return nil
-			}
-
-			scanner := bufio.NewScanner(file)
-			for scanner.Scan() {
-				line := strings.TrimSpace(scanner.Text())
-
-				// ignore empty lines
-				if line == "" {
-					continue
-				}
-
-				// strip comments
-				if strings.HasPrefix(line, "#") {
-					continue
-				}
-
-				line = os.ExpandEnv(line)
-				opts.Excludes = append(opts.Excludes, line)
-			}
+		// add patterns from file
+		if err := opts.loadExcludeFiles(); err != nil {
+			Warnf("error reading exclude patterns: %v", err)
+			return nil
 		}
 	}
 
@@ -497,5 +476,34 @@ func runBackup(opts BackupOptions, gopts GlobalOptions, args []string) error {
 
 	Verbosef("snapshot %s saved\n", id.Str())
 
+	return nil
+}
+
+// Populates `opts` with exclude lines found in exclude files, if any.
+func (opts *BackupOptions) loadExcludeFiles() error {
+	for _, filename := range opts.ExcludeFiles {
+		file, err := fs.Open(filename)
+		if err != nil {
+			return err
+		}
+
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+
+			// ignore empty lines
+			if line == "" {
+				continue
+			}
+
+			// strip comments
+			if strings.HasPrefix(line, "#") {
+				continue
+			}
+
+			line = os.ExpandEnv(line)
+			opts.Excludes = append(opts.Excludes, line)
+		}
+	}
 	return nil
 }
